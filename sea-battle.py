@@ -86,13 +86,13 @@ class Board:
         # добавляем корабль
         for x, y in ship.dots():
             if self._matrix[x][y] != '0':
-                raise ShipPlacementException(f"Клетка [{x}, {y}] уже занята!")
+                raise ShipPlacementException(f"Клетка [{x+1}, {y+1}] уже занята!")
         for x, y in ship.dots():
             self._matrix[x][y] = '■'
         self._ships.append(ship)
         self.contour(ship)
 
-    def contour(self, ship, counter_letter='K'):
+    def contour(self, ship, contour_letter='K'):
         # рисуем контур кораблей
         directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
         for coord in ship.dots():
@@ -101,10 +101,10 @@ class Board:
                 x3, y3 = x1 + x2, y1 + y2
                 if not self.out(Dot(x3, y3)):
                     if self._matrix[x3][y3] != '■' and self._matrix[x3][y3] != 'X':
-                        self._matrix[x3][y3] = counter_letter
+                        self._matrix[x3][y3] = contour_letter
 
     def display_hid(self):
-        print('   ' + '   '.join(str(i) for i in range(board_size)))
+        print('   ' + '   '.join(str(i+1) for i in range(board_size)))
         for i, row in enumerate(self._matrix):
             display_row = []
             for j, cell in enumerate(row):
@@ -117,7 +117,7 @@ class Board:
                 else:
                     # если это наше поле, то отображаем его полностью
                     display_row.append(cell)
-            print(str(i) + ' |' + '| |'.join(display_row) + '|')
+            print(str(i+1) + ' |' + '| |'.join(display_row) + '|')
 
     def out(self, dot):
         # проверяем, находятся ли введенные точки в границах поля
@@ -150,11 +150,11 @@ class Board:
                 self._matrix[dot.x][dot.y] = 'T'
                 return 'miss'
         else:
-            raise BoardOutException(f"Клетка {dot.x}, {dot.y} находится за пределами доски")
+            raise BoardOutException(f"Клетка {dot.x+1}, {dot.y+1} находится за пределами доски")
 
 class Player:
     def __init__(self, my_board, enemy_board):
-        self.my_boar = my_board
+        self.my_board = my_board
         self.enemy_board = enemy_board
 
     def ask(self):
@@ -165,7 +165,7 @@ class Player:
             try:
                 target = self.ask()
                 result = self.enemy_board.shot(Dot(*target))
-                print('Выстрел', [target[0], target[1]])
+                print('Выстрел', [target[0]+1, target[1]+1])
                 self.enemy_board.display_hid()
                 if result == 'sunk':
                     print('Корабль уничтожен!')
@@ -190,16 +190,17 @@ class User(Player):
         while True:
             # получаем точки для выстрела и проверяем их
             try:
-                coords = list(map(int, input("Введите через пробел 2 точки ").split()))
+                coords = list(map(int, input("Введите через пробел 2 точки (от 1 до 6): ").split()))
             except ValueError:
                 print('Ошибка: Вводить можно только цифры, попробуйте еще раз')
             else:
                 try:
                     if len(coords) != 2:
                         raise InvalidInputException("Ввести можно только 2 числа")
-                    if not (0 <= coords[0] < board_size and 0 <= coords[1] < board_size):
-                        raise IncorrectShot("Вы вышли за пределы доски")
-                    return coords[0], coords[1]
+                    if not (1 <= coords[0] <= board_size and 1 <= coords[1] <= board_size):
+                        raise IncorrectShot(f"Координаты должны быть от 1 до {board_size}")
+                    # Преобразуем введенные координаты (1-6) во внутренние (0-5)
+                    return coords[0]-1, coords[1]-1
                 except Exception as e:
                     print(f'Ошибка: {e}, попробуйте еще раз')
 
@@ -234,6 +235,7 @@ class Game:
             while not placed and attempts < 3000:
                 attempts += 1
                 try:
+                    # выбираются случайные точки и случайное направление
                     x = random.randint(0, board_size - 1)
                     y = random.randint(0, board_size - 1)
                     direction = (random.choice([1, 2]))
@@ -243,6 +245,7 @@ class Game:
                 except ShipPlacementException:
                     continue
             if not placed:
+                # если не удается разместить корабли, то пересоздается доска
                 return self.random_board()
         print("Доска соперника создана успешно!")
         return board
@@ -252,35 +255,51 @@ class Game:
               "'0' - пустые точки,\n'■' - ваш корабль,\n'K' - контур вашего корабля,\n'X' - подбитые корабли соперника,\n"
               "'T' - контур подбитых вражеских кораблей и точки, куда вы уже стреляли")
 
-    def setup_user_board(self):
+    def setup_my_board(self):
         print('Расставьте ваши корабли:')
-        self.my_board.display_hid()
+        board = Board(hid=False)
+        board.display_hid()
+        count = 0
         for i in ships:
             # пользователь расставляет корабли
             while True:
                 try:
-                    print(f"\nРазмещаем корабль размером {i}. Введите через пробел 2 точки - нос корабля")
+                    count += 1
+                    print(f'\nРазмещаем корабль размером {i}.')
                     x, y = self.user.ask()
                     if i > 1:
                         direction = int(input('Направление (1-вертикальное, 2-горизонтальное): '))
                         if direction not in (1, 2):
                             raise InvalidInputException("Направление может быть только 1 или 2")
                     else:
+                        # если длина 1, то направление не имеет значения, поэтому принудительно устанавливаем вертикальное
                         direction = 1
                     ship = Ship(i, (x, y), direction)
-                    self.my_board.add_ship(ship)
+                    board.add_ship(ship)
+                    not_full_lines = 0
+                    # проверка переполнения поля
+                    for line in board._matrix:
+                        if '0' in line:
+                            not_full_lines += 1
+                    # если поле переполнено и все корабли еще не размещены, то пересоздаем поле
+                    if not_full_lines == 0 and count < len(ships):
+                        print('\nДоска переполнена! Пересоздание доски\n')
+                        return self.setup_my_board()
                     break
                 except Exception as e:
                     print(f'Ошибка: {e}, попробуйте еще раз')
-
             os.system('cls' if os.name == 'nt' else 'clear')
             print("Ваше поле:")
-            self.my_board.display_hid()
+            board.display_hid()
+        return board
 
     def loop(self):
         self.enemy_board = self.random_board()
+        self.my_board = self.setup_my_board()
         self.user.enemy_board = self.enemy_board
+        self.user.my_board = self.my_board
         self.ai.my_board = self.enemy_board
+        self.ai.enemy_board = self.my_board
         print("Игра начинается")
         while True:
             # Ход пользователя
@@ -301,9 +320,7 @@ class Game:
 
     def start(self):
         self.greet()
-        self.setup_user_board()
         self.loop()
 
 g = Game()
 g.start()
-
