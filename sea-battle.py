@@ -245,7 +245,7 @@ class Game:
                 except ShipPlacementException:
                     continue
             if not placed:
-                # если не удается разместить корабли, то пересоздается доска
+                # если не удается разместить корабли, то пересоздается поле
                 return self.random_board()
         print("Доска соперника создана успешно!")
         return board
