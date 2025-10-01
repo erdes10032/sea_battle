@@ -1,7 +1,7 @@
 import os
 import random
 
-ships = [3, 2, 2, 1, 1, 1]
+ships = [3, 2, 2, 1, 1, 1, 1]
 board_size = 6
 
 # исключение - выход за границы доски
